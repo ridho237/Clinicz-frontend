@@ -13,7 +13,14 @@ export default function Home() {
 	const [loading, setLoading] = useState(false);
 
 	const handleSubmit = async () => {
+		if (text.trim().split(/\s+/).length < 5) {
+			alert('Masukkan minimal 5 kata gejala, ya!');
+			return;
+		}
+
 		setLoading(true);
+		setResult([]);
+
 		try {
 			const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/predict`, {
 				method: 'POST',
@@ -27,45 +34,55 @@ export default function Home() {
 			if (res.ok) {
 				setResult(data.data);
 			} else {
-				alert(data.message);
+				alert(data.message || 'Terjadi kesalahan saat memproses.');
 			}
 		} catch {
-			alert('Gagal memanggil backend API');
+			alert('Gagal memanggil backend API.');
 		} finally {
 			setLoading(false);
 		}
 	};
 
 	return (
-		<main className='flex flex-col m-auto content-center gap-2 w-2xl items-center justify-center p-4'>
-			<h1 className='text-xl mb-4 font-bold'>Coba sini aku tebak penyakit kamu melalui gejala</h1>
-			<textarea
-				className='w-full p-2 border mb-2 rounded'
-				rows={4}
-				value={text}
-				onChange={(e) => setText(e.target.value)}
-				placeholder='Masukkan gejala untuk prediksi...'
-			/>
-			<button
-				onClick={handleSubmit}
-				className='bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50'
-				disabled={loading}
-			>
-				{loading ? 'Memproses...' : 'Prediksi'}
-			</button>
+		<main
+			className='min-h-screen flex items-center justify-center px-4 py-8 bg-cover bg-center'
+			style={{
+				backgroundImage: "url('/background.png')",
+			}}
+		>
+			<div className='bg-white p-6 rounded-2xl shadow-xl w-full max-w-xl'>
+				<h1 className='text-2xl text-black font-bold text-center mb-2'>Coba Aku Tebak Penyakitmu Lewat Gejala</h1>
+				<p className='text-center text-black p-2'>Minimal 5 gejala ya ^_^</p>
 
-			{result.length > 0 && (
-				<div className='mt-4'>
-					<h2 className='text-lg font-semibold mb-2'>Hasil Prediksi Sicantik:</h2>
-					<ul className='list-disc list-inside'>
-						{result.map((item, index) => (
-							<li key={index}>
-								<span className='font-medium'>{item.label}</span> — {Math.round(item.confidence * 100)}%
-							</li>
-						))}
-					</ul>
-				</div>
-			)}
+				<textarea
+					className='w-full p-3 border rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4'
+					rows={4}
+					value={text}
+					onChange={(e) => setText(e.target.value)}
+					placeholder='Contoh: demam, batuk, pilek, sakit kepala, lemas...'
+				/>
+
+				<button
+					onClick={handleSubmit}
+					disabled={loading}
+					className='w-full bg-gray-700 hover:bg-gray-800 text-white py-2 rounded-lg font-semibold disabled:opacity-50'
+				>
+					{loading ? 'Memproses...' : 'Prediksi Sekarang'}
+				</button>
+
+				{result.length > 0 && (
+					<div className='mt-6'>
+						<h2 className='text-lg font-semibold mb-2 text-gray-800'>Hasil Prediksi:</h2>
+						<ul className='list-disc list-inside text-gray-700 space-y-1'>
+							{result.map((item, index) => (
+								<li key={index}>
+									<span className='font-medium'>{item.label}</span> — {Math.round(item.confidence * 100)}%
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+			</div>
 		</main>
 	);
 }
