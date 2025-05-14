@@ -7,6 +7,16 @@ type PredictionResult = {
 	deskripsi: string;
 };
 
+type PredictionItem = {
+	penyakit: string;
+	deskripsi: string;
+};
+
+type ObatItem = {
+	obat: string;
+	deskripsi: string;
+};
+
 export default function Home() {
 	const [text, setText] = useState('');
 	const [result, setResult] = useState<PredictionResult[]>([]);
@@ -36,9 +46,9 @@ export default function Home() {
 
 			const data = await res.json();
 			if (res.ok) {
-				const predictions = data.data;
+				const predictions: PredictionItem[] = data.data;
 				setResult(
-					predictions.map((item: any) => ({
+					predictions.map((item: PredictionItem) => ({
 						label: item.penyakit,
 						deskripsi: item.deskripsi,
 					}))
@@ -78,8 +88,9 @@ export default function Home() {
 			const data = await res.json();
 
 			if (res.ok) {
+				const obatItems: ObatItem[] = data.data;
 				setObatResult(
-					data.data.map((item: any) => ({
+					obatItems.map((item: ObatItem) => ({
 						label: item.obat,
 						deskripsi: item.deskripsi,
 					}))
