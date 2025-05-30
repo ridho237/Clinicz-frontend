@@ -17,11 +17,18 @@ type ObatItem = {
 	deskripsi: string;
 };
 
+type RekomendasiItem = {
+	obat: string;
+	kandungan: string;
+	similarity: number;
+};
+
 export default function Home() {
 	const [text, setText] = useState('');
 	const [result, setResult] = useState<PredictionResult[]>([]);
 	const [predictedDisease, setPredictedDisease] = useState<string | null>(null);
 	const [obatResult, setObatResult] = useState<PredictionResult[]>([]);
+	const [rekomendasiObat, setRekomendasiObat] = useState<RekomendasiItem[]>([]);
 	const [loading, setLoading] = useState(false);
 
 	const handleSubmit = async () => {
@@ -34,72 +41,111 @@ export default function Home() {
 		setResult([]);
 		setPredictedDisease(null);
 		setObatResult([]);
+		setRekomendasiObat([]);
 
 		try {
-			const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/penyakit`, {
+			const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/predict/penyakit`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({ text }),
 			});
-
 			const data = await res.json();
+			console.log('Hasil prediksi penyakit:', data);
 			if (res.ok) {
 				const predictions: PredictionItem[] = data.data;
 				setResult(
-					predictions.map((item: PredictionItem) => ({
+					predictions.map((item) => ({
 						label: item.penyakit,
 						deskripsi: item.deskripsi,
 					}))
 				);
 				if (predictions.length > 0) {
 					setPredictedDisease(predictions[0].penyakit);
+					console.log('Predicted disease diset:', predictions[0].penyakit);
 				}
 			} else {
-				alert(data.message ?? 'Terjadi kesalahan saat memproses.');
+				alert(data.message ?? 'Terjadi kesalahan.');
 			}
-		} catch {
-			alert('Gagal memanggil backend API.');
+		} catch (error) {
+			console.error('Error prediksi penyakit:', error);
+			alert('Gagal memanggil backend.');
 		} finally {
 			setLoading(false);
 		}
 	};
 
 	const handlePredictObat = async () => {
+		console.log('Menjalankan handlePredictObat dengan predictedDisease:', predictedDisease);
 		if (!predictedDisease) {
 			alert('Belum ada hasil prediksi penyakit.');
 			return;
 		}
 
+		setLoading(true);
+		setObatResult([]);
+		setRekomendasiObat([]);
+
 		try {
-			setLoading(true);
-			const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/obat`, {
+			const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/predict/obat`, {
 				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					gejala: text,
-					penyakit: predictedDisease,
-				}),
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ gejala: text, penyakit: predictedDisease }),
 			});
-
 			const data = await res.json();
-
+			console.log('Hasil prediksi obat:', data);
 			if (res.ok) {
 				const obatItems: ObatItem[] = data.data;
 				setObatResult(
-					obatItems.map((item: ObatItem) => ({
+					obatItems.map((item) => ({
 						label: item.obat,
 						deskripsi: item.deskripsi,
 					}))
 				);
+				console.log('Obat result diset:', obatItems);
 			} else {
-				alert(data.message ?? 'Terjadi kesalahan saat memprediksi obat.');
+				alert(data.message ?? 'Terjadi kesalahan saat prediksi obat.');
 			}
-		} catch {
-			alert('Gagal memanggil API prediksi obat.');
+		} catch (error) {
+			console.error('Error prediksi obat:', error);
+			alert('Gagal memanggil backend.');
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const handleRekomendasiObat = async () => {
+		console.log('Menjalankan handleRekomendasiObat dengan predictedDisease:', predictedDisease);
+		if (!predictedDisease) {
+			alert('Belum ada hasil prediksi penyakit.');
+			return;
+		}
+
+		const obatUtama = obatResult.length > 0 ? obatResult[0].label : null;
+		console.log('Obat utama untuk rekomendasi:', obatUtama);
+		if (!obatUtama) {
+			alert('Tidak ada obat yang bisa direkomendasikan.');
+			return;
+		}
+
+		setLoading(true);
+		setRekomendasiObat([]);
+
+		try {
+			const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/predict/rekomendasi-obat`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ obat: obatUtama, penyakit: predictedDisease }),
+			});
+			const data = await res.json();
+			console.log('Hasil rekomendasi obat:', data);
+			if (res.ok) {
+				setRekomendasiObat(data.data);
+			} else {
+				alert(data.message ?? 'Terjadi kesalahan saat rekomendasi.');
+			}
+		} catch (error) {
+			console.error('Error rekomendasi obat:', error);
+			alert('Gagal memanggil backend.');
 		} finally {
 			setLoading(false);
 		}
@@ -110,13 +156,13 @@ export default function Home() {
 			className='min-h-screen flex items-center justify-center px-4 py-8 bg-cover bg-center'
 			style={{ backgroundImage: "url('/background.png')" }}
 		>
-			<div className='bg-white p-6 rounded-2xl shadow-xl w-full max-w-xl'>
-				<h1 className='text-2xl text-black font-bold text-center mb-2'>Coba Aku Tebak Penyakitmu Lewat Gejala</h1>
-				<p className='text-center text-black p-2'>Minimal 5 gejala ya ^_^</p>
+			<div className='bg-white p-8 rounded-3xl shadow-2xl w-full max-w-2xl backdrop-blur-sm bg-opacity-90'>
+				<h1 className='text-3xl font-extrabold text-center text-gray-900 mb-3'>Coba Aku Tebak Penyakitmu!</h1>
+				<p className='text-center text-gray-600 mb-6'>Tulis minimal 5 gejala ya</p>
 
 				<textarea
-					className='w-full p-3 border rounded-lg text-black focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4'
-					rows={4}
+					className='w-full p-4 border border-gray-300 rounded-xl text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-400 transition mb-4'
+					rows={5}
 					value={text}
 					onChange={(e) => setText(e.target.value)}
 					placeholder='Contoh: demam, batuk, pilek, sakit kepala, lemas...'
@@ -125,19 +171,22 @@ export default function Home() {
 				<button
 					onClick={handleSubmit}
 					disabled={loading}
-					className='w-full bg-gray-700 hover:bg-gray-800 text-white py-2 rounded-lg font-semibold disabled:opacity-50'
+					className='w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white py-3 rounded-xl font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed'
 				>
-					{loading ? 'Memproses...' : 'Prediksi Sekarang'}
+					{loading ? 'Memproses...' : ' Prediksi Sekarang'}
 				</button>
 
 				{result.length > 0 && (
-					<div className='mt-6'>
-						<h2 className='text-lg font-semibold mb-2 text-gray-800'>Hasil Prediksi Penyakit:</h2>
-						<ul className='list-disc list-inside text-gray-700 space-y-2'>
-							{result.map((item, index) => (
-								<li key={index}>
-									<span className='font-medium'>{item.label}</span>
-									<p className='text-sm text-gray-600'>{item.deskripsi}</p>
+					<div className='mt-8'>
+						<h2 className='text-xl font-bold mb-3 text-gray-800'>Hasil Prediksi Penyakit:</h2>
+						<ul className='space-y-4'>
+							{result.map((item) => (
+								<li
+									key={item.label}
+									className='bg-gray-100 p-4 rounded-lg shadow-inner border border-gray-200'
+								>
+									<p className='font-semibold text-gray-800'>{item.label}</p>
+									<p className='text-sm text-gray-600 mt-1'>{item.deskripsi}</p>
 								</li>
 							))}
 						</ul>
@@ -145,31 +194,58 @@ export default function Home() {
 				)}
 
 				{predictedDisease && (
-					<div className='mt-4 text-center'>
-						<p className='text-sm text-gray-600 mb-2'>
-							Penyakit terprediksi: <strong>{predictedDisease}</strong>
-						</p>
-						<button
-							onClick={handlePredictObat}
-							disabled={loading}
-							className='bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold disabled:opacity-50'
-						>
-							{loading ? 'Memproses Obat...' : 'Prediksi Obat'}
-						</button>
+					<div className='mt-6 text-center'>
+						<div className='flex flex-col gap-3 sm:flex-row sm:justify-center'>
+							<button
+								onClick={handlePredictObat}
+								disabled={loading}
+								className='bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-lg font-semibold transition disabled:opacity-50'
+							>
+								{loading ? 'Memproses Obat...' : 'Prediksi Obat'}
+							</button>
+							<button
+								onClick={handleRekomendasiObat}
+								disabled={loading}
+								className='bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg font-semibold transition disabled:opacity-50'
+							>
+								{loading ? 'Memproses Rekomendasi...' : 'Rekomendasi Obat Lain'}
+							</button>
+						</div>
 					</div>
 				)}
 
 				{obatResult.length > 0 && (
-					<div className='mt-6'>
-						<h2 className='text-lg font-semibold mb-2 text-green-800'>Rekomendasi Obat:</h2>
-						<ul className='list-disc list-inside text-green-700 space-y-2'>
-							{obatResult.map((item, index) => (
-								<li key={index}>
-									<span className='font-medium'>{item.label}</span>
-									<p className='text-sm text-green-600'>{item.deskripsi}</p>
+					<div className='mt-8'>
+						<h2 className='text-xl font-bold mb-3 text-green-800'>Rekomendasi Obat:</h2>
+						<ul className='space-y-4'>
+							{obatResult.map((item) => (
+								<li
+									key={item.label}
+									className='bg-green-50 p-4 rounded-lg shadow-inner border border-green-200'
+								>
+									<p className='font-semibold text-green-800'>{item.label}</p>
+									<p className='text-sm text-green-600 mt-1'>{item.deskripsi}</p>
 								</li>
 							))}
 						</ul>
+					</div>
+				)}
+
+				{rekomendasiObat.length > 0 && (
+					<div className='mt-8'>
+						<h2 className='text-xl font-bold mb-4 text-blue-800'>Rekomendasi Obat Lainnya:</h2>
+						<div className='flex gap-4 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-blue-300'>
+							{rekomendasiObat.map((item) => (
+								<div
+									key={item.obat}
+									className='min-w-[200px] bg-blue-50 p-4 rounded-xl shadow-md border border-blue-200 flex-shrink-0'
+								>
+									<h3 className='text-lg font-semibold text-blue-800'>{item.obat}</h3>
+									<p className='text-sm text-blue-600 mt-1'>{item.kandungan}</p>
+									<p className='text-xs text-blue-500 mt-2'>Similarity: {(item.similarity * 100).toFixed(1)}%</p>
+								</div>
+							))}
+						</div>
 					</div>
 				)}
 			</div>
