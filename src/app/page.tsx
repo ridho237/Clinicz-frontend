@@ -25,6 +25,12 @@ type RekomendasiItem = {
 	similarity: number;
 };
 
+type KlinikItem = {
+	name: string;
+	address: string;
+	distance: number;
+};
+
 type ChatMessage = {
 	role: 'user' | 'model';
 	text: string;
@@ -38,6 +44,7 @@ export default function Home() {
 	const [rekomendasiObat, setRekomendasiObat] = useState<RekomendasiItem[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+	const [klinikTerdekat, setKlinikTerdekat] = useState<KlinikItem[]>([]);
 	const [chatInput, setChatInput] = useState('');
 	const [loadingChat, setLoadingChat] = useState(false);
 
@@ -192,6 +199,52 @@ export default function Home() {
 		}
 	};
 
+	const handleKlinikTerdekat = async () => {
+		if (!navigator.geolocation) {
+			alert('Geolocation tidak didukung oleh browser ini.');
+			return;
+		}
+
+		setLoading(true);
+		setKlinikTerdekat([]);
+
+		navigator.geolocation.getCurrentPosition(
+			async (position) => {
+				const { latitude, longitude } = position.coords;
+
+				try {
+					const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/location`, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							lat: latitude,
+							lng: longitude,
+						}),
+					});
+
+					const data = await res.json();
+					console.log('Hasil klinik terdekat:', data);
+
+					if (res.ok) {
+						setKlinikTerdekat(data.clinics); // <- Pastikan `clinics` sesuai response backend
+					} else {
+						alert(data.message ?? 'Terjadi kesalahan saat mengambil klinik terdekat.');
+					}
+				} catch (error) {
+					console.error('Error klinik terdekat:', error);
+					alert('Gagal memanggil backend.');
+				} finally {
+					setLoading(false);
+				}
+			},
+			(error) => {
+				console.error('Geolocation error:', error);
+				alert('Gagal mendapatkan lokasi. Pastikan izin lokasi diaktifkan.');
+				setLoading(false);
+			}
+		);
+	};
+
 	return (
 		<main
 			className='min-h-screen flex items-center justify-center px-4 py-8 bg-cover bg-center'
@@ -291,6 +344,34 @@ export default function Home() {
 						</div>
 					)}
 				</div>
+				<button
+					onClick={handleKlinikTerdekat}
+					disabled={loading}
+					className='bg-pink-600 hover:bg-pink-700 text-white px-5 py-2 rounded-lg font-semibold transition disabled:opacity-50'
+				>
+					{loading ? 'Memuat Klinik...' : 'Tampilkan Klinik Terdekat'}
+				</button>
+
+				{klinikTerdekat.length > 0 && (
+					<div className='mt-8'>
+						<h2 className='text-xl font-bold mb-4 text-red-800'>Klinik Terdekat:</h2>
+						<ul className='space-y-4'>
+							{klinikTerdekat.map((klinik, index) => (
+								<li
+									key={index}
+									className='bg-red-50 p-4 rounded-lg shadow-inner border border-red-200'
+								>
+									<p className='font-semibold text-red-800'>{klinik.name}</p>
+									<p className='text-sm text-red-600'>{klinik.address}</p>
+									<p className='text-xs text-red-500'>
+										Jarak: {klinik.distance !== undefined ? `${(klinik.distance / 1000).toFixed(2)} km` : 'Tidak diketahui'}
+									</p>
+								</li>
+							))}
+						</ul>
+					</div>
+				)}
+
 				{/* Panel Chatbot Gemini */}
 				<div className='bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-full flex flex-col'>
 					<h2 className='text-2xl font-extrabold mb-4 text-purple-700 flex items-center gap-2'>
