@@ -1,12 +1,23 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Bot, User } from 'lucide-react';
+
+import 'leaflet/dist/leaflet.css';
+import Link from 'next/link';
 
 type PredictionResult = {
 	label: string;
 	deskripsi: string;
+};
+
+type Article = {
+	id: string;
+	title: string;
+	date: string;
+	img: string;
+	tag: string[];
 };
 
 type PredictionItem = {
@@ -25,15 +36,29 @@ type RekomendasiItem = {
 	similarity: number;
 };
 
-type KlinikItem = {
-	name: string;
-	address: string;
-	distance: number;
-};
-
 type ChatMessage = {
 	role: 'user' | 'model';
 	text: string;
+};
+
+interface ClinicTags {
+	name?: string;
+	amenity?: string;
+	healthcare?: string;
+	building?: string;
+	wheelchair?: string;
+	'addr:full'?: string;
+	'addr:street'?: string;
+}
+
+type Clinic = {
+	name: string;
+	address: string;
+	lat: number;
+	lng: number;
+	distance: number;
+	tags: ClinicTags;
+	mapLink: string;
 };
 
 export default function Home() {
@@ -42,11 +67,52 @@ export default function Home() {
 	const [predictedDisease, setPredictedDisease] = useState<string | null>(null);
 	const [obatResult, setObatResult] = useState<PredictionResult[]>([]);
 	const [rekomendasiObat, setRekomendasiObat] = useState<RekomendasiItem[]>([]);
-	const [loading, setLoading] = useState(false);
+
 	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
-	const [klinikTerdekat, setKlinikTerdekat] = useState<KlinikItem[]>([]);
 	const [chatInput, setChatInput] = useState('');
 	const [loadingChat, setLoadingChat] = useState(false);
+	const [articles, setArticles] = useState<Article[]>([]);
+	const [loadingArticles, setLoadingArticles] = useState(false);
+	const [clinics, setClinics] = useState<Clinic[]>([]);
+	const [loading, setLoading] = useState(true);
+
+	useEffect(() => {
+		const fetchClinics = async () => {
+			try {
+				const res = await fetch('http://localhost:8000/location', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ lat: -6.46074, lng: 106.80201 }),
+				});
+
+				const data = await res.json();
+				setClinics(data.clinics);
+			} catch (err) {
+				console.error('Failed to load clinics:', err);
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchClinics();
+	}, []);
+
+	useEffect(() => {
+		const fetchArticles = async () => {
+			setLoadingArticles(true);
+			try {
+				const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/article`);
+				const data = await res.json();
+				setArticles(data);
+			} catch (error) {
+				console.error('Gagal memuat artikel:', error);
+			} finally {
+				setLoadingArticles(false);
+			}
+		};
+
+		fetchArticles();
+	}, []);
 
 	const handleSubmit = async () => {
 		if (text.trim().split(/\s+/).length < 5) {
@@ -189,7 +255,7 @@ export default function Home() {
 			});
 
 			const data = await res.json();
-			const reply = data.reply || 'Gemini tidak membalas.';
+			const reply = data.reply ?? 'Gemini tidak membalas.';
 			setChatMessages((prev) => [...prev, { role: 'model', text: reply }]);
 		} catch (err) {
 			console.error(err);
@@ -197,52 +263,6 @@ export default function Home() {
 		} finally {
 			setLoadingChat(false);
 		}
-	};
-
-	const handleKlinikTerdekat = async () => {
-		if (!navigator.geolocation) {
-			alert('Geolocation tidak didukung oleh browser ini.');
-			return;
-		}
-
-		setLoading(true);
-		setKlinikTerdekat([]);
-
-		navigator.geolocation.getCurrentPosition(
-			async (position) => {
-				const { latitude, longitude } = position.coords;
-
-				try {
-					const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/location`, {
-						method: 'POST',
-						headers: { 'Content-Type': 'application/json' },
-						body: JSON.stringify({
-							lat: latitude,
-							lng: longitude,
-						}),
-					});
-
-					const data = await res.json();
-					console.log('Hasil klinik terdekat:', data);
-
-					if (res.ok) {
-						setKlinikTerdekat(data.clinics); // <- Pastikan `clinics` sesuai response backend
-					} else {
-						alert(data.message ?? 'Terjadi kesalahan saat mengambil klinik terdekat.');
-					}
-				} catch (error) {
-					console.error('Error klinik terdekat:', error);
-					alert('Gagal memanggil backend.');
-				} finally {
-					setLoading(false);
-				}
-			},
-			(error) => {
-				console.error('Geolocation error:', error);
-				alert('Gagal mendapatkan lokasi. Pastikan izin lokasi diaktifkan.');
-				setLoading(false);
-			}
-		);
 	};
 
 	return (
@@ -344,34 +364,6 @@ export default function Home() {
 						</div>
 					)}
 				</div>
-				<button
-					onClick={handleKlinikTerdekat}
-					disabled={loading}
-					className='bg-pink-600 hover:bg-pink-700 text-white px-5 py-2 rounded-lg font-semibold transition disabled:opacity-50'
-				>
-					{loading ? 'Memuat Klinik...' : 'Tampilkan Klinik Terdekat'}
-				</button>
-
-				{klinikTerdekat.length > 0 && (
-					<div className='mt-8'>
-						<h2 className='text-xl font-bold mb-4 text-red-800'>Klinik Terdekat:</h2>
-						<ul className='space-y-4'>
-							{klinikTerdekat.map((klinik, index) => (
-								<li
-									key={index}
-									className='bg-red-50 p-4 rounded-lg shadow-inner border border-red-200'
-								>
-									<p className='font-semibold text-red-800'>{klinik.name}</p>
-									<p className='text-sm text-red-600'>{klinik.address}</p>
-									<p className='text-xs text-red-500'>
-										Jarak: {klinik.distance !== undefined ? `${(klinik.distance / 1000).toFixed(2)} km` : 'Tidak diketahui'}
-									</p>
-								</li>
-							))}
-						</ul>
-					</div>
-				)}
-
 				{/* Panel Chatbot Gemini */}
 				<div className='bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-full flex flex-col'>
 					<h2 className='text-2xl font-extrabold mb-4 text-purple-700 flex items-center gap-2'>
@@ -429,6 +421,72 @@ export default function Home() {
 							{loadingChat ? '...' : 'Kirim'}
 						</button>
 					</form>
+				</div>
+				{/* Panel Article*/}
+				<div className='bg-white p-6 rounded-2xl shadow-xl border border-gray-200 mt-10'>
+					<h2 className='text-2xl font-bold mb-4 text-gray-800'>Artikel Kesehatan</h2>
+					{loadingArticles ? (
+						<p>Memuat artikel...</p>
+					) : (
+						<div className='flex flex-col'>
+							{articles.map((article, idx) => {
+								if (!article) return null;
+
+								const tags = Array.isArray(article.tag) ? article.tag : [];
+
+								return (
+									<div
+										key={idx}
+										className='bg-gray-50 p-4 rounded-xl shadow-md'
+									>
+										<img
+											src={article.img}
+											alt={article.title}
+											className='w-full h-40 object-cover rounded-lg mb-3'
+										/>
+										<Link href={`/article/${article.id}`}>
+											<h3 className='text-lg font-semibold text-gray-900 hover:underline'>{article.title}</h3>
+										</Link>
+										<p className='text-sm text-gray-500 mb-2'>{article.date}</p>
+										<div className='flex flex-wrap gap-2'>
+											{tags.map((t, i) => (
+												<span
+													key={i}
+													className='bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full'
+												>
+													{t}
+												</span>
+											))}
+										</div>
+									</div>
+								);
+							})}
+						</div>
+					)}
+				</div>
+				{/* Panel Maps*/}
+				<div>
+					<h2 className='text-lg font-bold mb-4 '>Fasilitas Kesehatan Terdekat</h2>
+					<ul className='space-y-3'>
+						{clinics.map((clinic, idx) => (
+							<li
+								key={idx}
+								className='border p-4 rounded shadow bg-white'
+							>
+								<h3 className='text-md font-semibold'>{clinic.name}</h3>
+								<p>{clinic.address}</p>
+								<p className='text-sm text-gray-500'>Jarak: {clinic.distance.toFixed(1)} meter</p>
+								<a
+									href={clinic.mapLink}
+									target='_blank'
+									rel='noopener noreferrer'
+									className='text-blue-600 underline text-sm'
+								>
+									Lihat di Google Maps
+								</a>
+							</li>
+						))}
+					</ul>
 				</div>
 			</div>
 		</main>
