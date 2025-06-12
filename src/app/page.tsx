@@ -12,6 +12,12 @@ type PredictionResult = {
 	deskripsi: string;
 };
 
+type PredictionResultObat = {
+	label: string;
+	deskripsi: string;
+	gambar: string;
+};
+
 type Article = {
 	id: string;
 	title: string;
@@ -23,11 +29,13 @@ type Article = {
 type PredictionItem = {
 	penyakit: string;
 	deskripsi: string;
+	gambar: string;
 };
 
 type ObatItem = {
 	obat: string;
 	deskripsi: string;
+	gambar: string;
 };
 
 type RekomendasiItem = {
@@ -65,9 +73,8 @@ export default function Home() {
 	const [text, setText] = useState('');
 	const [result, setResult] = useState<PredictionResult[]>([]);
 	const [predictedDisease, setPredictedDisease] = useState<string | null>(null);
-	const [obatResult, setObatResult] = useState<PredictionResult[]>([]);
+	const [obatResult, setObatResult] = useState<PredictionResultObat[]>([]);
 	const [rekomendasiObat, setRekomendasiObat] = useState<RekomendasiItem[]>([]);
-
 	const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 	const [chatInput, setChatInput] = useState('');
 	const [loadingChat, setLoadingChat] = useState(false);
@@ -181,6 +188,7 @@ export default function Home() {
 				setObatResult(
 					obatItems.map((item) => ({
 						label: item.obat,
+						gambar: item.gambar,
 						deskripsi: item.deskripsi,
 					}))
 				);
@@ -338,6 +346,12 @@ export default function Home() {
 										key={item.label}
 										className='bg-green-50 p-4 rounded-lg shadow-inner border border-green-200'
 									>
+										<img
+											src={item.gambar}
+											// {`${process.env.NEXT_PUBLIC_API_URL}${item.gambar}`}
+											alt={item.label}
+											className='w-full h-80 object-cover rounded-lg mb-3'
+										/>
 										<p className='font-semibold text-green-800'>{item.label}</p>
 										<p className='text-sm text-green-600 mt-1'>{item.deskripsi}</p>
 									</li>
@@ -364,6 +378,7 @@ export default function Home() {
 						</div>
 					)}
 				</div>
+
 				{/* Panel Chatbot Gemini */}
 				<div className='bg-white p-6 rounded-2xl shadow-xl border border-gray-200 h-full flex flex-col'>
 					<h2 className='text-2xl font-extrabold mb-4 text-purple-700 flex items-center gap-2'>
@@ -422,6 +437,7 @@ export default function Home() {
 						</button>
 					</form>
 				</div>
+
 				{/* Panel Article*/}
 				<div className='bg-white p-6 rounded-2xl shadow-xl border border-gray-200 mt-10'>
 					<h2 className='text-2xl font-bold mb-4 text-gray-800'>Artikel Kesehatan</h2>
@@ -464,6 +480,7 @@ export default function Home() {
 						</div>
 					)}
 				</div>
+
 				{/* Panel Maps*/}
 				<div>
 					<h2 className='text-lg font-bold mb-4 '>Fasilitas Kesehatan Terdekat</h2>
